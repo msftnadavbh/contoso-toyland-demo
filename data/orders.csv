@@ -1,0 +1,13 @@
+order_id,date,product_id,product_name,quantity,unit_price
+CT-1001,2026-01-12,TOY-RC-001,Fast Racer RC Car,2,24.99
+CT-1002,2026-01-12,TOY-PL-020,Giant Teddy Bear,1,45.00
+CT-1003,2026-01-12,TOY-PZ-500,1000 Piece Puzzle,3,12.50
+CT-1004,2026-01-12,TOY-BL-101,Building Blocks Set,1,string_error
+CT-1005,2026-01-12,TOY-DG-005,Board Game Classics,5,19.99
+CT-1006,2026-01-12,TOY-RC-002,Drone Flyer,0,89.99
+CT-1007,2026-01-12,TOY-AC-055,Action Figure Hero,10,14.50
+CT-1008,2026-01-12,TOY-EL-900,Robot Dog,-1,120.00
+CT-1009,2026-01-12,TOY-SP-012,Soccer Ball,2,15.00
+CT-1010,2026-01-12,TOY-AR-300,Painting Set,1,22.00
+CT-1011,2026-01-12,MALFORMED,Mystery Box,1,9.99
+CT-1012,2026-01-12,,Empty Product ID,2,5.00
