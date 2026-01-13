@@ -246,7 +246,10 @@ Generate a bug report for the engineering team with severity, root cause, and fi
 ## 🔄 Reset for Next Demo
 
 ```bash
-# Re-run to regenerate fresh logs
+# Quick reset - regenerate logs and restore code
+./run-demo.sh --reset
+
+# Or manually:
 python3 python/processor.py
 node node/processor.js
 

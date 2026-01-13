@@ -1,6 +1,7 @@
 /**
- * Contoso Toyland - Order Processor (Node.js)
- * Processes orders from the data/orders.csv file and logs results.
+ * Contoso Toyland - Order Processor (Node.js) - FIXED VERSION
+ * This is the corrected version for reference after the demo.
+ * Compare with processor.js to see the bugs that were fixed.
  */
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +12,7 @@ if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
 }
 
-const logFile = path.join(logDir, 'node.log');
+const logFile = path.join(logDir, 'node_fixed.log');
 
 // Clear log file at start
 fs.writeFileSync(logFile, '');
@@ -26,7 +27,7 @@ function log(level, message) {
 }
 
 /**
- * Simulates inventory check - adds noise to logs
+ * Simulates inventory check
  */
 function validateInventory(productId) {
     log('DEBUG', `Checking inventory for product: ${productId}`);
@@ -35,7 +36,7 @@ function validateInventory(productId) {
 }
 
 /**
- * Simulates shipping calculation - adds noise to logs
+ * Simulates shipping calculation
  */
 function calculateShipping(quantity) {
     log('DEBUG', `Calculating shipping for ${quantity} items`);
@@ -46,42 +47,36 @@ function calculateShipping(quantity) {
     return shipping;
 }
 
-// Global state - simulates external config
-let discountConfig = null;
+// FIX: Initialize config immediately instead of lazy loading
+const discountConfig = {
+    baseRate: 0.15,
+    bonusCategories: ['RC', 'Robot', 'EL'],
+    maxDiscount: 0.50  // FIX: Cap at 50%
+};
+
 let orderHistory = [];
-
-// Track load attempts to make bug deterministic
-let configLoadAttempts = 0;
-
-/**
- * Loads discount configuration from "external source"
- * BUG: Race condition - config might not be loaded!
- */
-function loadDiscountConfig() {
-    configLoadAttempts++;
-    
-    // BUG: Config only loads on 3rd+ attempt - first orders always fail!
-    // Simulates async config that isn't ready immediately
-    if (configLoadAttempts >= 3) {
-        discountConfig = {
-            baseRate: 0.15,
-            bonusCategories: ['RC', 'Robot'],
-            maxDiscount: 0.25
-        };
-    }
-    // BUG: First 2 orders will have null discountConfig!
-}
 
 /**
  * Gets bonus rate based on product ID
- * BUG: Array index out of bounds!
+ * FIX: Validates array bounds before access!
  */
 function getBonusRate(productId) {
+    // FIX: Validate productId exists and has correct format
+    if (!productId || typeof productId !== 'string') {
+        log('WARNING', `Invalid product ID: ${productId}`);
+        return 0;
+    }
+    
     const parts = productId.split('-');
-    // BUG: Assumes parts[1] exists - crashes on malformed IDs
+    
+    // FIX: Check array bounds before accessing
+    if (parts.length < 2) {
+        log('WARNING', `Malformed product ID: ${productId} (expected format: XXX-YY-ZZZ)`);
+        return 0;
+    }
+    
     const category = parts[1].toUpperCase();
     
-    // BUG: Accessing property of potentially null discountConfig
     if (discountConfig.bonusCategories.includes(category)) {
         return 0.05;
     }
@@ -90,15 +85,18 @@ function getBonusRate(productId) {
 
 /**
  * Calculates loyalty bonus from order history
- * BUG: Off-by-one error and undefined access!
+ * FIX: Corrected off-by-one error!
  */
 function getLoyaltyBonus(orderId) {
+    // FIX: Check history BEFORE adding current order
+    const previousOrder = orderHistory.length > 0 
+        ? orderHistory[orderHistory.length - 1]  // FIX: -1 not missing!
+        : null;
+    
+    // Now add current order to history
     orderHistory.push(orderId);
     
-    // BUG: Off-by-one - accesses index that doesn't exist yet
-    const previousOrder = orderHistory[orderHistory.length];
-    
-    // BUG: Calling method on undefined
+    // FIX: Safe access with null check
     if (previousOrder && previousOrder.startsWith('CT-100')) {
         return 0.02;
     }
@@ -107,24 +105,23 @@ function getLoyaltyBonus(orderId) {
 
 /**
  * Applies the holiday discount for the January Rush sale.
- * BUG: Multiple issues - null refs, array bounds, race conditions!
+ * FIX: All issues resolved - null refs, array bounds, race conditions!
  */
 function applyHolidayDiscount(total, orderId, productId) {
     log('INFO', `Applying holiday discount for order ${orderId}`);
     
-    // Load config (might fail silently)
-    loadDiscountConfig();
-    
-    // BUG 1: discountConfig might be null here
+    // FIX: Config is always available (initialized at module load)
     let discountRate = discountConfig.baseRate;
     
-    // BUG 2: getBonusRate has array index issues
+    // FIX: getBonusRate now validates inputs
     discountRate += getBonusRate(productId);
     
-    // BUG 3: getLoyaltyBonus has off-by-one error
+    // FIX: getLoyaltyBonus now handles off-by-one
     discountRate += getLoyaltyBonus(orderId);
     
-    // BUG 4: No cap check - discount could exceed 100%
+    // FIX: Cap discount to prevent negative prices
+    discountRate = Math.min(discountRate, discountConfig.maxDiscount);
+    
     const discountAmount = total * discountRate;
     const finalPrice = total - discountAmount;
     
@@ -134,14 +131,15 @@ function applyHolidayDiscount(total, orderId, productId) {
 
 /**
  * Main order processing function.
- * Processes a single order and returns success/failure status.
+ * FIX: Better validation and error handling.
  */
 function processOrder(order) {
     const orderId = order.order_id || 'UNKNOWN';
     
     try {
         log('INFO', `========== Processing Order ${orderId} ==========`);
-        log('INFO', `Customer order received: ${order.product_name}`);
+        log('INFO', `Customer: ${order.customer_name || 'Unknown'}`);
+        log('INFO', `Product: ${order.product_name}`);
         
         // Step 1: Parse and validate quantity
         log('DEBUG', `Parsing quantity value: '${order.quantity}'`);
@@ -151,22 +149,30 @@ function processOrder(order) {
         log('DEBUG', `Parsing unit price value: '${order.unit_price}'`);
         const price = parseFloat(order.unit_price);
         
-        // Check for parsing failures
+        // FIX: More descriptive error messages
         if (isNaN(qty)) {
-            throw new Error(`Invalid quantity value: '${order.quantity}' is not a number`);
+            log('ERROR', `Invalid quantity '${order.quantity}' for order ${orderId} - skipping`);
+            return false;
         }
         
         if (isNaN(price)) {
-            throw new Error(`Invalid price value: '${order.unit_price}' is not a number`);
+            log('ERROR', `Invalid price '${order.unit_price}' for order ${orderId} - skipping`);
+            return false;
         }
         
         // Step 3: Business rule validation
         if (qty < 0) {
-            throw new Error(`Quantity cannot be negative. Received: ${qty}`);
+            log('ERROR', `Negative quantity (${qty}) for order ${orderId} - skipping`);
+            return false;
         }
         
         if (qty === 0) {
             log('WARNING', `Order ${orderId} has zero quantity - flagging for review`);
+        }
+        
+        if (price < 0) {
+            log('ERROR', `Negative price ($${price}) for order ${orderId} - skipping`);
+            return false;
         }
         
         // Step 4: Inventory check
@@ -191,6 +197,7 @@ function processOrder(order) {
         const finalTotal = discountedTotal + tax + shipping;
         
         log('INFO', `Order ${orderId} processed successfully!`);
+        log('INFO', `  Customer: ${order.customer_name || 'Unknown'}`);
         log('INFO', `  Product: ${order.product_name}`);
         log('INFO', `  Subtotal: $${subtotal.toFixed(2)}`);
         log('INFO', `  After Discount: $${discountedTotal.toFixed(2)}`);
@@ -202,16 +209,8 @@ function processOrder(order) {
         return true;
 
     } catch (error) {
-        log('ERROR', `VALIDATION ERROR on order ${orderId}: ${error.message}`);
-        log('ERROR', `  Raw data - Qty: '${order.quantity}', Price: '${order.unit_price}'`);
-        
-        // Log stack trace for debugging
-        if (error.message.includes('not a number')) {
-            log('CRITICAL', `DATA CORRUPTION detected in order ${orderId}`);
-            log('CRITICAL', `  This indicates malformed CSV data or upstream system failure`);
-            log('CRITICAL', `  Stack trace: ${error.stack}`);
-        }
-        
+        log('CRITICAL', `UNEXPECTED ERROR on order ${orderId}: ${error.message}`);
+        log('CRITICAL', `Stack trace: ${error.stack}`);
         return false;
     }
 }
@@ -243,12 +242,12 @@ function main() {
     const csvPath = path.join(__dirname, '..', 'data', 'orders.csv');
     
     console.log('='.repeat(60));
-    console.log('  CONTOSO TOYLAND - Order Processing System (Node.js)');
-    console.log('  Holiday Rush Batch Processor v2.1');
+    console.log('  CONTOSO TOYLAND - Order Processing System (Node.js FIXED)');
+    console.log('  Holiday Rush Batch Processor v2.1 - CORRECTED');
     console.log('='.repeat(60));
     
     log('INFO', '='.repeat(60));
-    log('INFO', 'CONTOSO TOYLAND ORDER PROCESSOR STARTED');
+    log('INFO', 'CONTOSO TOYLAND ORDER PROCESSOR STARTED (FIXED VERSION)');
     log('INFO', `Processing file: ${csvPath}`);
     log('INFO', '='.repeat(60));
     
@@ -286,7 +285,7 @@ function main() {
     console.log(`  Total Orders: ${totalOrders}`);
     console.log(`  Successful:   ${successCount}`);
     console.log(`  Failed:       ${errorCount}`);
-    console.log('\nCheck logs/node.log for detailed output.');
+    console.log('\nCheck logs/node_fixed.log for detailed output.');
 }
 
 main();

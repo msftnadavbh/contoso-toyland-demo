@@ -22,14 +22,17 @@ contoso-toyland/
 
 ### Run the Python Processor
 ```bash
-cd /home/nadav/geektime
 python3 python/processor.py
 ```
 
 ### Run the Node.js Processor
 ```bash
-cd /home/nadav/geektime
 node node/processor.js
+```
+
+### Run Both (Quick Setup)
+```bash
+./run-demo.sh
 ```
 
 Both processors will read from `data/orders.csv` and generate verbose logs in the `logs/` directory.
